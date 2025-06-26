@@ -9,6 +9,12 @@ def infer(model_path: Path, input_dir: Path, output_dir: Path) -> None:
     """Apply a trained model to new imagery using OpenCD."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    if not model_path.is_file():
+        raise FileNotFoundError(f"Model file {model_path} not found")
+
+    if not input_dir.is_dir():
+        raise FileNotFoundError(f"Input directory {input_dir} not found")
+
     try:
         import opencd  # noqa: F401 - only check availability
     except ImportError as e:
@@ -29,7 +35,9 @@ def infer(model_path: Path, input_dir: Path, output_dir: Path) -> None:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run change detection inference")
+    parser = argparse.ArgumentParser(
+        description="Run change detection inference"
+    )
     parser.add_argument("model", type=Path, help="Path to trained model")
     parser.add_argument("input_dir", type=Path, help="Directory with imagery")
     parser.add_argument("output_dir", type=Path, help="Directory for predictions")

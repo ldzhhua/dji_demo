@@ -14,9 +14,9 @@ This project aims to build a change detection platform based on [OpenCD](https:/
 
 1. **Dataset Preparation**
    ```bash
-   python dataset/create_dataset.py <raw_images_dir> <output_dataset_dir> [--val-ratio 0.2]
+   python dataset/create_dataset.py <raw_images_dir> <output_dataset_dir> [--val-ratio 0.2] [--seed 42]
    ```
-   Copies images to train/val splits for quick experimentation.
+   Copies images to train/val splits for quick experimentation. 设置 `--seed` 可以确保结果可复现。
 2. **Model Training**
    ```bash
    python training/train_model.py <config.py> <work_dir>

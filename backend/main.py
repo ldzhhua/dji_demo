@@ -10,7 +10,7 @@ app = FastAPI(title="Change Detection API")
 
 
 @app.post("/detect")
-def detect(input_path: str, model_path: Optional[str] = None):
+async def detect(input_path: str, model_path: Optional[str] = None):
     """Run change detection on ``input_path`` using the given model."""
     input_file = Path(input_path)
     if model_path is not None:
