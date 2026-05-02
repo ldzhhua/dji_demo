@@ -1,16 +1,21 @@
 # UAV Change Detection Platform
 
-This project aims to build a change detection platform based on [OpenCD](https://github.com/opendatalab/OpenCD). It will provide tools for dataset creation, model training, and model inference using Python 3.10+ along with a Vue 3 frontend.
+This project aims to build a change detection platform based on [OpenCD](https://github.com/opendatalab/OpenCD). It provides tools for dataset creation, model training, model inference, and a modern browser dashboard.
 
 ## Repository Structure
 
 - `dataset/` – scripts to prepare training datasets.
 - `training/` – utilities for training change detection models with OpenCD.
 - `inference/` – scripts to run trained models for change detection.
-- `backend/` – a simple FastAPI application exposing API endpoints.
-- `frontend/` – placeholder for the Vue 3 web application.
+- `backend/` – a FastAPI application exposing API endpoints and serving the dashboard.
+- `frontend/` – a modern static dashboard for dataset, training, inference, and job monitoring.
 
 ## Development
+
+Install the API dependencies first:
+```bash
+python3 -m pip install -r requirements.txt
+```
 
 1. **Dataset Preparation**
    ```bash
@@ -27,11 +32,11 @@ This project aims to build a change detection platform based on [OpenCD](https:/
    python inference/run_inference.py <model.pth> <input_dir> <pred_dir>
    ```
    Also relies on OpenCD for running the inference pipeline.
-4. **Backend**
+4. **Backend and Dashboard**
    ```bash
    uvicorn backend.main:app --reload
    ```
-5. **Frontend**
-   See `frontend/README.md` for instructions on creating the Vue 3 project.
 
-This repository currently provides skeleton code to get started. Detailed implementation of data processing, training logic, and inference integration with OpenCD is left as future work.
+   Open `http://127.0.0.1:8000` to use the dashboard. API endpoints are available under `/api/*`.
+
+OpenCD is still required for actual model training and inference. If OpenCD is not installed, those jobs are captured as failed tasks with a clear error message.
