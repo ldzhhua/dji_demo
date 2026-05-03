@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from dataset.create_dataset import create_dataset
 from inference.run_inference import infer
-from training.train_model import train
+from training.train_model import train, train_demo
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -28,7 +28,7 @@ DEMO_RAW_DIR = DATA_DIR / "demo_raw"
 DEMO_OUTPUT_DIR = DATA_DIR / "demo_processed"
 
 TaskStatus = Literal["queued", "running", "completed", "failed"]
-TaskKind = Literal["dataset", "training", "inference"]
+TaskKind = Literal["dataset", "training", "inference", "pipeline"]
 
 
 @dataclass
@@ -67,6 +67,11 @@ class DemoDatasetRequest(BaseModel):
     output_dir: str | None = Field(None, examples=[".uav_platform/demo_processed"])
     val_ratio: float = Field(0.25, ge=0, le=1)
     seed: int | None = Field(42, examples=[42])
+
+
+class DemoPipelineRequest(DemoDatasetRequest):
+    work_dir: str | None = Field(None, examples=[".uav_platform/demo_run"])
+    prediction_dir: str | None = Field(None, examples=[".uav_platform/demo_predictions"])
 
 
 app = FastAPI(
@@ -239,16 +244,10 @@ def delete_job(job_id: str):
 
 @app.post("/api/demo-dataset")
 def prepare_demo_dataset(request: DemoDatasetRequest):
-    DEMO_RAW_DIR.mkdir(parents=True, exist_ok=True)
-    for stale_image in DEMO_RAW_DIR.glob("*"):
-        if stale_image.is_file():
-            stale_image.unlink()
-    for index in range(request.image_count):
-        image_path = DEMO_RAW_DIR / f"demo_uav_{index + 1:03d}.jpg"
-        image_path.write_bytes(b"demo-uav-image")
+    demo = build_demo_images(request.image_count)
     output_dir = Path(request.output_dir) if request.output_dir else DEMO_OUTPUT_DIR
     return {
-        "input_dir": str(DEMO_RAW_DIR),
+        "input_dir": str(demo),
         "output_dir": str(output_dir),
         "image_count": request.image_count,
         "val_ratio": request.val_ratio,
@@ -275,14 +274,73 @@ def create_dataset_job(request: DatasetRequest, background_tasks: BackgroundTask
     return serialize_job(job)
 
 
+@app.post("/api/demo-pipeline")
+def create_demo_pipeline_job(
+    request: DemoPipelineRequest,
+    background_tasks: BackgroundTasks,
+):
+    def action(job: Job) -> dict[str, Any]:
+        raw_dir = build_demo_images(request.image_count)
+        dataset_dir = Path(request.output_dir) if request.output_dir else DEMO_OUTPUT_DIR
+        work_dir = Path(request.work_dir) if request.work_dir else DATA_DIR / "demo_run"
+        prediction_dir = (
+            Path(request.prediction_dir)
+            if request.prediction_dir
+            else DATA_DIR / "demo_predictions"
+        )
+
+        job.progress = 25
+        job.message = "Creating demo dataset split"
+        save_job(job)
+        dataset_summary = create_dataset(
+            raw_dir,
+            dataset_dir,
+            request.val_ratio,
+            request.seed,
+        )
+
+        job.progress = 55
+        job.message = "Training demo model artifact"
+        save_job(job)
+        model_summary = train_demo(Path("demo_config.py"), work_dir, dataset_dir)
+
+        job.progress = 82
+        job.message = "Generating demo prediction masks"
+        save_job(job)
+        inference_summary = infer(
+            Path(model_summary.model_path),
+            dataset_dir / "val",
+            prediction_dir,
+            demo_mode=True,
+        )
+        return {
+            "mode": "demo",
+            "dataset": asdict(dataset_summary),
+            "training": asdict(model_summary),
+            "inference": inference_summary,
+        }
+
+    job = create_job("pipeline", "Run complete demo pipeline")
+    background_tasks.add_task(run_job, job.id, action)
+    return serialize_job(job)
+
+
 @app.post("/api/training")
 def create_training_job(request: TrainingRequest, background_tasks: BackgroundTasks):
     def action(job: Job) -> dict[str, Any]:
         job.progress = 45
-        job.message = "Launching OpenCD training"
+        job.message = "Launching training"
         save_job(job)
-        train(Path(request.config_path), Path(request.work_dir))
-        return {"config_path": request.config_path, "work_dir": request.work_dir}
+        config_path = Path(request.config_path)
+        work_dir = Path(request.work_dir)
+        if is_opencd_available():
+            train(config_path, work_dir)
+            return {
+                "mode": "opencd",
+                "config_path": request.config_path,
+                "work_dir": request.work_dir,
+            }
+        return asdict(train_demo(config_path, work_dir))
 
     job = create_job("training", "Train change detection model")
     background_tasks.add_task(run_job, job.id, action)
@@ -293,14 +351,14 @@ def create_training_job(request: TrainingRequest, background_tasks: BackgroundTa
 def create_inference_job(request: InferenceRequest, background_tasks: BackgroundTasks):
     def action(job: Job) -> dict[str, Any]:
         job.progress = 45
-        job.message = "Launching OpenCD inference"
+        job.message = "Launching inference"
         save_job(job)
-        infer(Path(request.model_path), Path(request.input_dir), Path(request.output_dir))
-        return {
-            "model_path": request.model_path,
-            "input_dir": request.input_dir,
-            "output_dir": request.output_dir,
-        }
+        return infer(
+            Path(request.model_path),
+            Path(request.input_dir),
+            Path(request.output_dir),
+            demo_mode=not is_opencd_available(),
+        )
 
     job = create_job("inference", "Run change detection inference")
     background_tasks.add_task(run_job, job.id, action)
@@ -329,6 +387,17 @@ def is_opencd_available() -> bool:
     except ImportError:
         return False
     return True
+
+
+def build_demo_images(image_count: int) -> Path:
+    DEMO_RAW_DIR.mkdir(parents=True, exist_ok=True)
+    for stale_image in DEMO_RAW_DIR.glob("*"):
+        if stale_image.is_file():
+            stale_image.unlink()
+    for index in range(image_count):
+        image_path = DEMO_RAW_DIR / f"demo_uav_{index + 1:03d}.jpg"
+        image_path.write_bytes(b"demo-uav-image")
+    return DEMO_RAW_DIR
 
 
 if FRONTEND_DIR.exists():

@@ -19,6 +19,7 @@ const els = {
   tabs: document.querySelectorAll(".tab-button"),
   forms: document.querySelectorAll(".action-form"),
   demoDatasetButton: document.querySelector("#demo-dataset-button"),
+  demoPipelineButton: document.querySelector("#demo-pipeline-button"),
   clearJobsButton: document.querySelector("#clear-jobs-button"),
   cancelClearButton: document.querySelector("#cancel-clear-button"),
   confirmClearButton: document.querySelector("#confirm-clear-button"),
@@ -113,6 +114,7 @@ function kindLabel(kind) {
     dataset: "数据集",
     training: "训练",
     inference: "推理",
+    pipeline: "完整流水线",
   }[kind] || kind;
 }
 
@@ -243,6 +245,24 @@ async function prepareDemoDataset() {
   }
 }
 
+async function runDemoPipeline() {
+  els.demoPipelineButton.disabled = true;
+  els.demoPipelineButton.textContent = "运行中...";
+  try {
+    await requestJson("/api/demo-pipeline", {
+      method: "POST",
+      body: JSON.stringify({ image_count: 8, val_ratio: 0.25, seed: 42 }),
+    });
+    showToast("完整演示流水线已启动");
+    await refresh();
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    els.demoPipelineButton.disabled = false;
+    els.demoPipelineButton.textContent = "一键完整跑通";
+  }
+}
+
 async function clearJobs() {
   await requestJson("/api/jobs", { method: "DELETE" });
   closeConfirmDialog();
@@ -276,6 +296,7 @@ els.forms.forEach((form) => {
 
 document.querySelector("#refresh-button").addEventListener("click", refresh);
 els.demoDatasetButton.addEventListener("click", prepareDemoDataset);
+els.demoPipelineButton.addEventListener("click", runDemoPipeline);
 els.clearJobsButton.addEventListener("click", openConfirmDialog);
 els.cancelClearButton.addEventListener("click", closeConfirmDialog);
 els.confirmClearButton.addEventListener("click", clearJobs);

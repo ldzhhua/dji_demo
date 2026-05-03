@@ -17,6 +17,7 @@
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#workspace">开始处理</a>
+            <button class="button primary subtle" id="demo-pipeline-button" type="button">一键完整跑通</button>
             <button class="button" id="refresh-button" type="button">刷新状态</button>
             <button class="button" id="demo-dataset-button" type="button">填入演示数据</button>
           </div>
@@ -39,7 +40,7 @@
               <span class="step-icon">02</span>
               <div>
                 <strong>模型训练</strong>
-                <span>调用 OpenCD 训练入口</span>
+                <span>OpenCD 可用时真实训练，否则生成演示模型产物</span>
               </div>
               <span>OpenCD</span>
             </div>
@@ -47,7 +48,7 @@
               <span class="step-icon">03</span>
               <div>
                 <strong>变化推理</strong>
-                <span>输出预测掩膜目录</span>
+                <span>输出预测掩膜目录，演示模式可完整生成结果</span>
               </div>
               <span>Deploy</span>
             </div>
@@ -80,7 +81,7 @@
         <div class="section-header">
           <div>
             <h2>工作流操作</h2>
-            <p>选择任务类型，填写本机路径后提交。任务结果会持久保存到本地任务时间线。</p>
+            <p>可单步运行，也可点击“一键完整跑通”在当前环境生成数据集、模型产物和推理结果。</p>
           </div>
           <div class="tabs" aria-label="任务类型">
             <button class="tab-button active" data-action="dataset" type="button">数据集</button>

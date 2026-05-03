@@ -26,12 +26,12 @@ python3 -m pip install -r requirements.txt
    ```bash
    python training/train_model.py <config.py> <work_dir>
    ```
-   Requires [OpenCD](https://github.com/opendatalab/OpenCD) to be installed.
+   Requires [OpenCD](https://github.com/opendatalab/OpenCD) to be installed for real training. For local smoke tests, add `--demo` to create deterministic demo model artifacts.
 3. **Inference**
    ```bash
    python inference/run_inference.py <model.pth> <input_dir> <pred_dir>
    ```
-   Also relies on OpenCD for running the inference pipeline.
+   Also relies on OpenCD for real inference. For local smoke tests, add `--demo-mode` to generate deterministic demo prediction masks.
 4. **Backend and Dashboard**
    ```bash
    uvicorn backend.main:app --reload
@@ -44,6 +44,7 @@ python3 -m pip install -r requirements.txt
 - Persistent job history stored in `.uav_platform/jobs.json`.
 - Job metrics, live polling, individual job deletion, and one-click history clearing.
 - Demo dataset generation from the dashboard for a quick successful dataset split.
+- Complete demo pipeline that runs dataset preparation, demo training, and demo inference end to end without OpenCD.
 - OpenCD readiness display with clear failed task messages when training or inference dependencies are unavailable.
 
-OpenCD is still required for actual model training and inference. If OpenCD is not installed, those jobs are captured as failed tasks with a clear error message.
+OpenCD is still required for actual model training and inference. If OpenCD is not installed, use the dashboard's "完整演示流水线" button to run a full local demo, or submit real OpenCD jobs and see clear failed task messages.
