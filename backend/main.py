@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from dataset.create_dataset import create_dataset
 from inference.run_inference import infer
-from training.train_model import train, train_demo
+from training.train_model import resolve_opencd_tool, train, train_demo
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -54,12 +54,16 @@ class DatasetRequest(BaseModel):
 class TrainingRequest(BaseModel):
     config_path: str = Field(..., examples=["configs/changeformer.py"])
     work_dir: str = Field(..., examples=["runs/changeformer"])
+    opencd_root: str | None = Field(None, examples=["/opt/open-cd"])
 
 
 class InferenceRequest(BaseModel):
     model_path: str = Field("model.pth", examples=["runs/best.pth"])
+    config_path: str = Field(..., examples=["configs/changeformer.py"])
     input_dir: str = Field(..., examples=["data/inference"])
     output_dir: str = Field("predictions", examples=["predictions/latest"])
+    image_a_dir: str | None = Field(None, examples=["data/inference/A"])
+    image_b_dir: str | None = Field(None, examples=["data/inference/B"])
 
 
 class DemoDatasetRequest(BaseModel):
@@ -224,6 +228,24 @@ def get_job(job_id: str):
     return serialize_job(job)
 
 
+@app.get("/api/opencd")
+def opencd_status():
+    train_script: str | None
+    try:
+        train_script = str(resolve_opencd_tool("train.py"))
+    except RuntimeError:
+        train_script = None
+    return {
+        "available": is_opencd_available(),
+        "train_script": train_script,
+        "message": (
+            "OpenCD is ready"
+            if is_opencd_available()
+            else "Set OPENCD_ROOT to the OpenCD repository and install OpenCD dependencies"
+        ),
+    }
+
+
 @app.delete("/api/jobs")
 def clear_jobs():
     with jobs_lock:
@@ -331,16 +353,11 @@ def create_training_job(request: TrainingRequest, background_tasks: BackgroundTa
         job.progress = 45
         job.message = "Launching training"
         save_job(job)
-        config_path = Path(request.config_path)
-        work_dir = Path(request.work_dir)
-        if is_opencd_available():
-            train(config_path, work_dir)
-            return {
-                "mode": "opencd",
-                "config_path": request.config_path,
-                "work_dir": request.work_dir,
-            }
-        return asdict(train_demo(config_path, work_dir))
+        return train(
+            Path(request.config_path),
+            Path(request.work_dir),
+            opencd_root=Path(request.opencd_root) if request.opencd_root else None,
+        )
 
     job = create_job("training", "Train change detection model")
     background_tasks.add_task(run_job, job.id, action)
@@ -357,7 +374,9 @@ def create_inference_job(request: InferenceRequest, background_tasks: Background
             Path(request.model_path),
             Path(request.input_dir),
             Path(request.output_dir),
-            demo_mode=not is_opencd_available(),
+            config_path=Path(request.config_path),
+            image_a_dir=Path(request.image_a_dir) if request.image_a_dir else None,
+            image_b_dir=Path(request.image_b_dir) if request.image_b_dir else None,
         )
 
     job = create_job("inference", "Run change detection inference")
@@ -375,6 +394,7 @@ def detect(
     input_file = Path(input_path)
     request = InferenceRequest(
         model_path=model_path or "model.pth",
+        config_path="config.py",
         input_dir=str(input_file.parent),
         output_dir="predictions",
     )

@@ -26,12 +26,12 @@ python3 -m pip install -r requirements.txt
    ```bash
    python training/train_model.py <config.py> <work_dir>
    ```
-   Requires [OpenCD](https://github.com/opendatalab/OpenCD) to be installed for real training. For local smoke tests, add `--demo` to create deterministic demo model artifacts.
+   Real training uses the OpenCD repository entry point `tools/train.py`. Set `OPENCD_ROOT=/path/to/open-cd` so the platform can locate it. For local smoke tests, add `--demo` to create deterministic demo model artifacts.
 3. **Inference**
    ```bash
-   python inference/run_inference.py <model.pth> <input_dir> <pred_dir>
+   python inference/run_inference.py <config.py> <model.pth> <input_dir> <pred_dir>
    ```
-   Also relies on OpenCD for real inference. For local smoke tests, add `--demo-mode` to generate deterministic demo prediction masks.
+   Real inference uses `opencd.apis.OpenCDInferencer`. Put A/B image pairs in subfolders named `A` and `B`, or use filenames ending in `_A` and `_B`. For local smoke tests, add `--demo-mode` to generate deterministic demo prediction masks.
 4. **Backend and Dashboard**
    ```bash
    uvicorn backend.main:app --reload
@@ -45,6 +45,6 @@ python3 -m pip install -r requirements.txt
 - Job metrics, live polling, individual job deletion, and one-click history clearing.
 - Demo dataset generation from the dashboard for a quick successful dataset split.
 - Complete demo pipeline that runs dataset preparation, demo training, and demo inference end to end without OpenCD.
-- OpenCD readiness display with clear failed task messages when training or inference dependencies are unavailable.
+- OpenCD readiness display with real training/inference forms for config, checkpoint, classes, and palette options.
 
-OpenCD is still required for actual model training and inference. If OpenCD is not installed, use the dashboard's "完整演示流水线" button to run a full local demo, or submit real OpenCD jobs and see clear failed task messages.
+OpenCD is still required for actual model training and inference. If OpenCD is not installed, use the dashboard's "一键完整跑通" button to run a full local demo, or submit real OpenCD jobs and see clear failed task messages.

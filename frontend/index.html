@@ -121,7 +121,7 @@
 
             <form class="form-card action-form" data-action="training" hidden>
               <h3>启动 OpenCD 训练</h3>
-              <p>传入 OpenCD 配置文件和输出工作目录，后端负责调用训练入口。</p>
+              <p>传入 OpenCD 配置文件和输出工作目录，后端会调用 OPENCD_ROOT/tools/train.py。</p>
               <div class="field-grid">
                 <label>
                   配置文件路径
@@ -130,6 +130,10 @@
                 <label>
                   工作目录
                   <input name="work_dir" placeholder="runs/changeformer" required />
+                </label>
+                <label class="wide">
+                  OpenCD 根目录（可选）
+                  <input name="opencd_root" placeholder="/opt/open-cd 或设置 OPENCD_ROOT" />
                 </label>
               </div>
               <div class="form-actions">
@@ -140,15 +144,19 @@
 
             <form class="form-card action-form" data-action="inference" hidden>
               <h3>执行变化检测推理</h3>
-              <p>选择模型、输入影像目录和预测输出目录，生成变化检测结果。</p>
+              <p>选择 OpenCD 配置、权重和 A/B 影像对目录，生成变化检测结果。</p>
               <div class="field-grid">
                 <label>
-                  模型路径
+                  配置文件路径
+                  <input name="config_path" placeholder="configs/changer/changer_ex_r18.py" required />
+                </label>
+                <label>
+                  权重路径
                   <input name="model_path" value="model.pth" required />
                 </label>
                 <label>
-                  输入影像目录
-                  <input name="input_dir" placeholder="data/inference" required />
+                  A/B 影像对目录
+                  <input name="input_dir" placeholder="data/inference_pairs" required />
                 </label>
                 <label class="wide">
                   输出目录
@@ -156,7 +164,7 @@
                 </label>
               </div>
               <div class="form-actions">
-                <span class="hint">推理失败会记录在任务时间线</span>
+                <span class="hint">目录中可放 *_A / *_B 文件，或 A 和 B 子目录</span>
                 <button class="button primary" type="submit">开始推理</button>
               </div>
             </form>

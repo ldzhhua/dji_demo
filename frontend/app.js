@@ -43,6 +43,7 @@ const actionConfig = {
     fields: (form) => ({
       config_path: form.config_path.value.trim(),
       work_dir: form.work_dir.value.trim(),
+      opencd_root: form.opencd_root.value.trim() || null,
     }),
   },
   inference: {
@@ -50,8 +51,14 @@ const actionConfig = {
     success: "推理任务已提交",
     fields: (form) => ({
       model_path: form.model_path.value.trim(),
+      config_path: form.config_path.value.trim(),
       input_dir: form.input_dir.value.trim(),
       output_dir: form.output_dir.value.trim(),
+      classes: form.classes.value
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+      palette: form.palette.value.trim() || null,
     }),
   },
 };
