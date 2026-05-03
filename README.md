@@ -39,4 +39,11 @@ python3 -m pip install -r requirements.txt
 
    Open `http://127.0.0.1:8000` to use the dashboard. API endpoints are available under `/api/*`.
 
+## Dashboard Features
+
+- Persistent job history stored in `.uav_platform/jobs.json`.
+- Job metrics, live polling, individual job deletion, and one-click history clearing.
+- Demo dataset generation from the dashboard for a quick successful dataset split.
+- OpenCD readiness display with clear failed task messages when training or inference dependencies are unavailable.
+
 OpenCD is still required for actual model training and inference. If OpenCD is not installed, those jobs are captured as failed tasks with a clear error message.

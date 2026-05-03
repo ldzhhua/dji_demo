@@ -3,6 +3,7 @@ const state = {
   overview: null,
   jobs: [],
   selectedAction: "dataset",
+  pollTimer: null,
 };
 
 const els = {
@@ -17,6 +18,11 @@ const els = {
   toast: document.querySelector("#toast"),
   tabs: document.querySelectorAll(".tab-button"),
   forms: document.querySelectorAll(".action-form"),
+  demoDatasetButton: document.querySelector("#demo-dataset-button"),
+  clearJobsButton: document.querySelector("#clear-jobs-button"),
+  cancelClearButton: document.querySelector("#cancel-clear-button"),
+  confirmClearButton: document.querySelector("#confirm-clear-button"),
+  confirmDialog: document.querySelector("#confirm-modal"),
 };
 
 const actionConfig = {
@@ -86,6 +92,7 @@ function renderJobs() {
               <span class="status-dot ${job.status}"></span>
               <h3>${job.title}</h3>
               <span class="job-kind">${kindLabel(job.kind)}</span>
+              <span class="badge ${job.status}">${statusLabel(job.status)}</span>
             </div>
             <p>${job.message}</p>
             ${job.result ? `<pre>${JSON.stringify(job.result, null, 2)}</pre>` : ""}
@@ -93,6 +100,7 @@ function renderJobs() {
           <div class="job-side">
             <strong>${job.progress}%</strong>
             <span>${formatDate(job.updated_at)}</span>
+            <button class="icon-button" type="button" data-delete-job="${job.id}">删除</button>
           </div>
         </article>
       `,
@@ -108,11 +116,22 @@ function kindLabel(kind) {
   }[kind] || kind;
 }
 
+function statusLabel(status) {
+  return {
+    queued: "排队",
+    running: "运行中",
+    completed: "完成",
+    failed: "失败",
+  }[status] || status;
+}
+
 function showToast(message, isError = false) {
   els.toast.textContent = message;
   els.toast.classList.toggle("error", isError);
   els.toast.hidden = false;
+  els.toast.classList.add("show");
   window.setTimeout(() => {
+    els.toast.classList.remove("show");
     els.toast.hidden = true;
   }, 3200);
 }
@@ -123,7 +142,14 @@ async function requestJson(url, options) {
     ...options,
   });
   if (!response.ok) {
-    throw new Error(`请求失败：${response.status}`);
+    let message = `请求失败：${response.status}`;
+    try {
+      const error = await response.json();
+      message = error.detail || message;
+    } catch {
+      // Keep the generic HTTP message when the server does not return JSON.
+    }
+    throw new Error(message);
   }
   return response.json();
 }
@@ -141,9 +167,23 @@ async function refresh() {
     setApiState(true);
     renderOverview();
     renderJobs();
+    updatePolling();
   } catch (error) {
     setApiState(false);
     showToast(error.message, true);
+  }
+}
+
+function updatePolling() {
+  const hasActiveJobs = state.jobs.some((job) =>
+    ["queued", "running"].includes(job.status),
+  );
+  if (hasActiveJobs && !state.pollTimer) {
+    state.pollTimer = window.setInterval(refresh, 1600);
+  }
+  if (!hasActiveJobs && state.pollTimer) {
+    window.clearInterval(state.pollTimer);
+    state.pollTimer = null;
   }
 }
 
@@ -182,6 +222,48 @@ async function submitAction(event) {
   }
 }
 
+async function prepareDemoDataset() {
+  els.demoDatasetButton.disabled = true;
+  try {
+    const demo = await requestJson("/api/demo-dataset", {
+      method: "POST",
+      body: JSON.stringify({ image_count: 8, val_ratio: 0.25, seed: 42 }),
+    });
+    const form = document.querySelector(".action-form[data-action='dataset']");
+    form.input_dir.value = demo.input_dir;
+    form.output_dir.value = demo.output_dir;
+    form.val_ratio.value = demo.val_ratio;
+    form.seed.value = demo.seed ?? "";
+    switchAction("dataset");
+    showToast("演示数据已生成，可直接创建数据集");
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    els.demoDatasetButton.disabled = false;
+  }
+}
+
+async function clearJobs() {
+  await requestJson("/api/jobs", { method: "DELETE" });
+  closeConfirmDialog();
+  showToast("任务记录已清空");
+  await refresh();
+}
+
+async function deleteJob(jobId) {
+  await requestJson(`/api/jobs/${jobId}`, { method: "DELETE" });
+  showToast("任务已删除");
+  await refresh();
+}
+
+function openConfirmDialog() {
+  els.confirmDialog.hidden = false;
+}
+
+function closeConfirmDialog() {
+  els.confirmDialog.hidden = true;
+}
+
 els.tabs.forEach((button) => {
   button.addEventListener("click", () => switchAction(button.dataset.action));
 });
@@ -193,6 +275,21 @@ els.forms.forEach((form) => {
 });
 
 document.querySelector("#refresh-button").addEventListener("click", refresh);
+els.demoDatasetButton.addEventListener("click", prepareDemoDataset);
+els.clearJobsButton.addEventListener("click", openConfirmDialog);
+els.cancelClearButton.addEventListener("click", closeConfirmDialog);
+els.confirmClearButton.addEventListener("click", clearJobs);
+els.confirmDialog.addEventListener("click", (event) => {
+  if (event.target === els.confirmDialog) {
+    closeConfirmDialog();
+  }
+});
+els.jobList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-delete-job]");
+  if (button) {
+    deleteJob(button.dataset.deleteJob);
+  }
+});
 
 switchAction(state.selectedAction);
 refresh();

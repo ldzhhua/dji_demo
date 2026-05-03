@@ -136,6 +136,18 @@ input {
   font-weight: 800;
 }
 
+.button.danger {
+  border-color: rgba(251, 113, 133, 0.32);
+  color: #fecdd3;
+  background: rgba(127, 29, 29, 0.22);
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+  transform: none;
+}
+
 .status-card {
   z-index: 1;
   align-self: stretch;
@@ -201,7 +213,7 @@ input {
 
 .pipeline-step span,
 .metric span,
-.job p,
+.job-card p,
 .form-card p {
   color: var(--muted);
 }
@@ -228,6 +240,12 @@ input {
   max-width: 620px;
   margin: 8px 0 0;
   color: var(--muted);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .metrics {
@@ -337,34 +355,101 @@ input:focus {
   padding: 22px;
 }
 
+.jobs-title,
+.jobs-panel-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.jobs-panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .jobs-list {
   display: grid;
   gap: 12px;
   margin-top: 18px;
 }
 
-.job {
+.job-card {
   padding: 16px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 18px;
   background: rgba(15, 23, 42, 0.64);
 }
 
-.job-head {
+.job-card:has(.badge.completed) {
+  border-color: rgba(52, 211, 153, 0.28);
+}
+
+.job-card:has(.badge.failed) {
+  border-color: rgba(251, 113, 133, 0.28);
+}
+
+.job-heading {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
 }
 
-.job strong {
+.job-heading h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.job-card strong {
   display: block;
 }
 
-.job p {
+.job-card p {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.job-card pre {
+  overflow: auto;
+  max-height: 160px;
+  margin: 12px 0 0;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  color: #dbeafe;
+  background: rgba(2, 6, 23, 0.46);
+  font-size: 12px;
+.job-kind {
+  color: #bae6fd;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.job-side {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.icon-button {
+  min-width: 46px;
+  height: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  color: var(--muted);
+  background: rgba(15, 23, 42, 0.7);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: #fecdd3;
+  border-color: rgba(251, 113, 133, 0.32);
 }
 
 .badge {
@@ -439,6 +524,48 @@ input:focus {
 .toast.show {
   opacity: 1;
   transform: translateY(0);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.66);
+  backdrop-filter: blur(12px);
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-card {
+  width: min(420px, 100%);
+  padding: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 24px;
+  background: var(--panel-strong);
+  box-shadow: var(--shadow);
+}
+
+.modal-card h3 {
+  margin: 0 0 10px;
+  font-size: 22px;
+}
+
+.modal-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
 }
 
 @media (max-width: 920px) {

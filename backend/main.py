@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,10 @@ from training.train_model import train
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
+DATA_DIR = BASE_DIR / ".uav_platform"
+JOBS_FILE = DATA_DIR / "jobs.json"
+DEMO_RAW_DIR = DATA_DIR / "demo_raw"
+DEMO_OUTPUT_DIR = DATA_DIR / "demo_processed"
 
 TaskStatus = Literal["queued", "running", "completed", "failed"]
 TaskKind = Literal["dataset", "training", "inference"]
@@ -57,6 +62,13 @@ class InferenceRequest(BaseModel):
     output_dir: str = Field("predictions", examples=["predictions/latest"])
 
 
+class DemoDatasetRequest(BaseModel):
+    image_count: int = Field(8, ge=2, le=200)
+    output_dir: str | None = Field(None, examples=[".uav_platform/demo_processed"])
+    val_ratio: float = Field(0.25, ge=0, le=1)
+    seed: int | None = Field(42, examples=[42])
+
+
 app = FastAPI(
     title="UAV Change Detection Platform",
     description="Dataset preparation, OpenCD training and inference dashboard.",
@@ -69,7 +81,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-jobs: dict[str, Job] = {}
 jobs_lock = Lock()
 
 
@@ -81,10 +92,45 @@ def serialize_job(job: Job) -> dict[str, Any]:
     return asdict(job)
 
 
+def load_jobs() -> dict[str, Job]:
+    if not JOBS_FILE.exists():
+        return {}
+    try:
+        raw_jobs = json.loads(JOBS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    loaded: dict[str, Job] = {}
+    for raw_job in raw_jobs:
+        try:
+            job = Job(**raw_job)
+        except TypeError:
+            continue
+        if job.status in {"queued", "running"}:
+            job.status = "failed"
+            job.progress = 100
+            job.message = "Server restarted before this task completed"
+            job.updated_at = now_iso()
+        loaded[job.id] = job
+    return loaded
+
+
+def persist_jobs_unlocked() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    payload = [serialize_job(job) for job in jobs.values()]
+    temporary_file = JOBS_FILE.with_suffix(".tmp")
+    temporary_file.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    temporary_file.replace(JOBS_FILE)
+
+
 def save_job(job: Job) -> None:
     job.updated_at = now_iso()
     with jobs_lock:
         jobs[job.id] = job
+        persist_jobs_unlocked()
 
 
 def create_job(kind: TaskKind, title: str) -> Job:
@@ -112,6 +158,9 @@ def run_job(job_id: str, action: Callable[[Job], dict[str, Any]]) -> None:
     save_job(job)
 
 
+jobs: dict[str, Job] = load_jobs()
+
+
 @app.get("/")
 def index():
     """Serve the dashboard shell."""
@@ -125,6 +174,7 @@ def health():
         "service": app.title,
         "opencd_available": is_opencd_available(),
         "jobs": len(jobs),
+        "storage": str(JOBS_FILE),
     }
 
 
@@ -167,6 +217,43 @@ def get_job(job_id: str):
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return serialize_job(job)
+
+
+@app.delete("/api/jobs")
+def clear_jobs():
+    with jobs_lock:
+        jobs.clear()
+        persist_jobs_unlocked()
+    return {"message": "All jobs cleared"}
+
+
+@app.delete("/api/jobs/{job_id}")
+def delete_job(job_id: str):
+    with jobs_lock:
+        if job_id not in jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
+        del jobs[job_id]
+        persist_jobs_unlocked()
+    return {"message": "Job deleted", "job_id": job_id}
+
+
+@app.post("/api/demo-dataset")
+def prepare_demo_dataset(request: DemoDatasetRequest):
+    DEMO_RAW_DIR.mkdir(parents=True, exist_ok=True)
+    for stale_image in DEMO_RAW_DIR.glob("*"):
+        if stale_image.is_file():
+            stale_image.unlink()
+    for index in range(request.image_count):
+        image_path = DEMO_RAW_DIR / f"demo_uav_{index + 1:03d}.jpg"
+        image_path.write_bytes(b"demo-uav-image")
+    output_dir = Path(request.output_dir) if request.output_dir else DEMO_OUTPUT_DIR
+    return {
+        "input_dir": str(DEMO_RAW_DIR),
+        "output_dir": str(output_dir),
+        "image_count": request.image_count,
+        "val_ratio": request.val_ratio,
+        "seed": request.seed,
+    }
 
 
 @app.post("/api/datasets")
