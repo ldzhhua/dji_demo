@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UAV Change Detection Platform</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <span class="eyebrow">现代化无人机变化检测工作台</span>
+          <h1>UAV 变化检测指挥中心</h1>
+          <p>
+            集成数据集拆分、OpenCD 训练、模型推理和任务监控，用一个界面完成从原始影像到变化结果的核心流程。
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#workspace">开始处理</a>
+            <button class="button primary subtle" id="demo-pipeline-button" type="button">一键完整跑通</button>
+            <button class="button" id="refresh-button" type="button">刷新状态</button>
+            <button class="button" id="demo-dataset-button" type="button">填入演示数据</button>
+          </div>
+        </div>
+        <aside class="status-card">
+          <div class="status-top">
+            <span class="status-dot" id="api-state">API 检查中</span>
+            <span class="badge" id="opencd-badge">OpenCD 检查中</span>
+          </div>
+          <div class="pipeline">
+            <div class="pipeline-step">
+              <span class="step-icon">01</span>
+              <div>
+                <strong>数据集准备</strong>
+                <span>原始影像拆分为训练集和验证集</span>
+              </div>
+              <span>Ready</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-icon">02</span>
+              <div>
+                <strong>模型训练</strong>
+                <span>OpenCD 可用时真实训练，否则生成演示模型产物</span>
+              </div>
+              <span>OpenCD</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-icon">03</span>
+              <div>
+                <strong>变化推理</strong>
+                <span>输出预测掩膜目录，演示模式可完整生成结果</span>
+              </div>
+              <span>Deploy</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section">
+        <div class="metrics">
+          <article class="metric">
+            <span>总任务</span>
+            <strong id="job-count">0</strong>
+          </article>
+          <article class="metric">
+            <span>已完成</span>
+            <strong id="completed-count">0</strong>
+          </article>
+          <article class="metric">
+            <span>运行中</span>
+            <strong id="running-count">0</strong>
+          </article>
+          <article class="metric">
+            <span>失败</span>
+            <strong id="failed-count">0</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="workspace">
+        <div class="section-header">
+          <div>
+            <h2>工作流操作</h2>
+            <p>可单步运行，也可点击“一键完整跑通”在当前环境生成数据集、模型产物和推理结果。</p>
+          </div>
+          <div class="tabs" aria-label="任务类型">
+            <button class="tab-button active" data-action="dataset" type="button">数据集</button>
+            <button class="tab-button" data-action="training" type="button">训练</button>
+            <button class="tab-button" data-action="inference" type="button">推理</button>
+          </div>
+        </div>
+
+        <div class="workspace">
+          <div class="forms">
+            <form class="form-card action-form" data-action="dataset">
+              <h3>创建训练/验证数据集</h3>
+              <p>复制图片到 train 和 val 目录，支持可复现随机种子。</p>
+              <div class="field-grid">
+                <label>
+                  原始图片目录
+                  <input name="input_dir" placeholder="data/raw" required />
+                </label>
+                <label>
+                  输出数据集目录
+                  <input name="output_dir" placeholder="data/processed" required />
+                </label>
+                <label>
+                  验证集比例
+                  <input name="val_ratio" type="number" min="0" max="1" step="0.05" value="0.2" />
+                </label>
+                <label>
+                  随机种子
+                  <input name="seed" type="number" placeholder="42" />
+                </label>
+              </div>
+              <div class="form-actions">
+                <span class="hint">支持 jpg、jpeg、png</span>
+                <button class="button primary" type="submit">创建数据集</button>
+              </div>
+            </form>
+
+            <form class="form-card action-form" data-action="training" hidden>
+              <h3>启动 OpenCD 训练</h3>
+              <p>传入 OpenCD 配置文件和输出工作目录，后端会调用 OPENCD_ROOT/tools/train.py。</p>
+              <div class="field-grid">
+                <label>
+                  配置文件路径
+                  <input name="config_path" placeholder="configs/changeformer.py" required />
+                </label>
+                <label>
+                  工作目录
+                  <input name="work_dir" placeholder="runs/changeformer" required />
+                </label>
+                <label class="wide">
+                  OpenCD 根目录（可选）
+                  <input name="opencd_root" placeholder="/opt/open-cd 或设置 OPENCD_ROOT" />
+                </label>
+              </div>
+              <div class="form-actions">
+                <span class="hint">需要环境中已安装 OpenCD</span>
+                <button class="button primary" type="submit">启动训练</button>
+              </div>
+            </form>
+
+            <form class="form-card action-form" data-action="inference" hidden>
+              <h3>执行变化检测推理</h3>
+              <p>选择 OpenCD 配置、权重和 A/B 影像对目录，生成变化检测结果。</p>
+              <div class="field-grid">
+                <label>
+                  配置文件路径
+                  <input name="config_path" placeholder="configs/changer/changer_ex_r18.py" required />
+                </label>
+                <label>
+                  权重路径
+                  <input name="model_path" value="model.pth" required />
+                </label>
+                <label>
+                  A/B 影像对目录
+                  <input name="input_dir" placeholder="data/inference_pairs" required />
+                </label>
+                <label class="wide">
+                  输出目录
+                  <input name="output_dir" value="predictions" required />
+                </label>
+              </div>
+              <div class="form-actions">
+                <span class="hint">目录中可放 *_A / *_B 文件，或 A 和 B 子目录</span>
+                <button class="button primary" type="submit">开始推理</button>
+              </div>
+            </form>
+          </div>
+
+          <aside class="jobs-panel">
+            <div class="jobs-panel-header">
+              <div>
+                <h3>实时任务时间线</h3>
+                <p>查看每个任务的状态、进度、错误信息和输出摘要。</p>
+              </div>
+              <button class="button danger" id="clear-jobs-button" type="button">清空</button>
+            </div>
+            <div class="empty" id="empty-jobs">暂无任务，请先创建数据集或提交推理。</div>
+            <div class="jobs-list" id="job-list"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <div id="confirm-modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <span class="eyebrow">危险操作</span>
+        <h2 id="confirm-title">清空全部任务记录？</h2>
+        <p>该操作会删除本地持久化任务时间线，但不会删除已经生成的数据集文件。</p>
+        <div class="modal-actions">
+          <button class="button" id="cancel-clear-button" type="button">取消</button>
+          <button class="button danger" id="confirm-clear-button" type="button">确认清空</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>
